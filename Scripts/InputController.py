@@ -13,9 +13,10 @@ class InputController(cave.Component):
         self.right = KeyInput(['D', 'RIGHT'])
         self.jump = KeyInput(['SPACE'])
         self.interact = KeyInput(['F'])
+        self.shift = KeyInput(['LSHIFT'])
 
         self.allInputs = [self.up, self.down, self.left,
-                          self.right, self.jump, self.interact]
+                          self.right, self.jump, self.interact, self.shift]
         pass
 
     def start(self, scene):
@@ -29,7 +30,6 @@ class InputController(cave.Component):
         for input in self.allInputs:
             for key in input.keyBindings:
                 if events.pressed(key):
-                    print(key)
                     input.start = True
                     input.active = True
                     input.end = False
