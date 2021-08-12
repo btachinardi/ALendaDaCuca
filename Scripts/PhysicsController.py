@@ -51,9 +51,14 @@ class PhysicsController(cave.Component):
             self.groundPosition = None
             self.groundAttriction = 0
             self.groundNormal = None
+            return True
+        return False
 
     def move(self, direction):
-        self.direction = direction
+        if self.onGround:
+            self.direction = direction
+            return True
+        return False
 
     def start(self, scene):
         transform = self.entity.getTransform()

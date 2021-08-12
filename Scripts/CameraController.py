@@ -7,7 +7,7 @@ class CameraController(cave.Component):
     def __init__(self):
         CameraController.instances.append(self)
         self.angle = 30
-        self.distance = 10
+        self.distance = 5
         self.target = None
         self.smoothPosition = 0.1
         self.smoothRotation = 0.05
