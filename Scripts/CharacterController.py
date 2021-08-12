@@ -24,8 +24,8 @@ class CharacterController(cave.Component):
 
     def __init__(self):
         CharacterController.instances.append(self)
-        self.speed = 1.5
-        self.runSpeed = 7.5
+        self.speed = 3
+        self.runSpeed = 5
         self.maxStamina = 10
         self.staminaReset = self.maxStamina * 0.75
         self.currentStamina = self.maxStamina
@@ -77,8 +77,8 @@ class CharacterController(cave.Component):
             CharacterSM.Idle:  'LauraIdle',
             CharacterSM.InAir:  'LauraJumpAir',
             CharacterSM.Jumping:  'LauraJumpStart',
-            CharacterSM.Landing:  'LauraFallStop',
-            CharacterSM.RunLanding:  'LauraFallRun',
+            CharacterSM.Landing:  'LauraJumpFallStop',
+            CharacterSM.RunLanding:  'LauraJumpFallRun',
             CharacterSM.HardLanding:  'LauraFallHard',
             CharacterSM.Sliding:  'LauraSlide',
             CharacterSM.Walking:  'LauraWalking',
@@ -91,6 +91,25 @@ class CharacterController(cave.Component):
 
     def firstUpdate(self):
         self.physics = PhysicsController.findFirstInEntity(self.entity)
+        self.physics.onGround.append(lambda v: self.onGround(v))
+        self.physics.onAir.append(lambda: self.onAir())
+        if self.physics.isGrounded:
+            self.stateMachine.setState(CharacterSM.Idle)
+        else:
+            self.stateMachine.setState(CharacterSM.InAir)
+
+    def onGround(self, velocity):
+        print('ground')
+        if velocity < -10:
+            self.stateMachine.setState(CharacterSM.HardLanding)
+        elif velocity < -5:
+            self.stateMachine.setState(CharacterSM.Landing)
+        else:
+            self.stateMachine.setState(CharacterSM.Idle)
+
+    def onAir(self):
+        print('air')
+        self.stateMachine.setState(CharacterSM.InAir)
 
     def update(self):
         if self.isFirstUpdate:
@@ -108,7 +127,7 @@ class CharacterController(cave.Component):
         self.direction = MathUtils.lerp(
             self.direction, self.targetDirection, self.rotateSmooth)
         transform.lookAt(MathUtils.deg2vecXZ(self.direction))
-        self.stateMachine.update()
+        self.stateMachine.update(self.delta)
 
 
 class State:
@@ -117,28 +136,42 @@ class State:
         self.animation = animation
         self.contextMesh = contextMesh
         self.transitions = []
+        self.time = 0
 
-    def update(self):
-        self.transitions.sort(reverse=True, key=lambda t: t.priority)
+    def update(self, delta):
+        self.time += delta
         for transition in self.transitions:
-            result = transition.check()
+            result = transition.update()
             if result != None:
                 return result
         return self.name
 
+    def reset(self):
+        self.time = 0
+
     def enter(self):
+        self.time = 0
+        for transition in self.transitions:
+            transition.enter()
         if self.animation != None and self.contextMesh != None:
             self.contextMesh.setAnimation(self.animation)
 
     def exit(self):
-        pass
+        for transition in self.transitions:
+            transition.exit()
 
     def addTransition(self, checker, priority=0):
         self.transitions.append(StateTransition(checker, priority))
+        self.transitions.sort(reverse=True, key=lambda t: t.priority)
 
     def addAnimationTransition(self, targetState, priority=-999):
         def transitionChecker():
             return targetState if self.contextMesh.getAnimationLoops() > 0 else None
+        self.transitions.append(StateTransition(transitionChecker, priority))
+
+    def addTimeTransition(self, time, targetState, priority=0):
+        def transitionChecker():
+            return targetState if self.time > time else None
         self.transitions.append(StateTransition(transitionChecker, priority))
 
     def setAnimation(self, animation):
@@ -146,11 +179,17 @@ class State:
 
 
 class StateTransition:
-    def __init__(self, checker, priority=0):
+    def __init__(self, checker, state, priority=0):
         self.checker = checker
         self.priority = priority
 
-    def check(self):
+    def enter(self):
+        pass
+
+    def exit(self):
+        pass
+
+    def update(self):
         return self.checker()
 
 
@@ -162,27 +201,29 @@ class StateMachine:
         self.contextMesh = contextMesh
         pass
 
-    def addState(self, name, animation=None, targetState=None):
+    def addState(self, name, animation=None):
         if self.defaultState == None:
             self.defaultState = name
 
         state = State(name, self.contextMesh)
         self.states[name] = state
         if animation != None:
-            self.setAnimation(name, animation, targetState)
+            state.setAnimation(animation)
         return state
 
-    def setAnimation(self, state, animation, targetState=None):
-        self.states[state].setAnimation(animation)
-        if targetState != None:
-            self.states[state].addAnimationTransition(targetState)
+    def addAnimationState(self, state, animationsMap):
+        animation = animationsMap[state] if animationsMap != None else state
+        return self.addState(state, animation)
 
-    def update(self):
+    def update(self, delta):
         newState = self.defaultState
         if self.currentState != None:
             state = self.states[self.currentState]
-            newState = state.update()
-        self.setState(newState)
+            newState = state.update(delta)
+
+        # Setting state causes it to reset, so we can´t call it from update if it hasn't changed
+        if self.currentState != newState:
+            self.setState(newState)
 
     def setState(self, newState):
         if self.currentState != newState:
@@ -191,6 +232,9 @@ class StateMachine:
             self.currentState = newState
             if self.currentState != None:
                 self.states[self.currentState].enter()
+        else:
+            if self.currentState != None:
+                self.states[self.currentState].reset()
 
 
 class CharacterSM(StateMachine):
@@ -207,20 +251,19 @@ class CharacterSM(StateMachine):
     def __init__(self, contextMesh=None, animationsMap=None):
         super().__init__(contextMesh)
 
-        self.idle = self.addCharState(CharacterSM.Idle, animationsMap)
-        self.inAir = self.addCharState(CharacterSM.InAir, animationsMap)
-        self.jumping = self.addCharState(CharacterSM.Jumping, animationsMap)
-        self.landing = self.addCharState(CharacterSM.Landing, animationsMap)
-        self.runLanding = self.addCharState(
-            CharacterSM.RunLanding, animationsMap)
-        self.hardLanding = self.addCharState(
-            CharacterSM.HardLanding, animationsMap)
-        self.sliding = self.addCharState(CharacterSM.Sliding, animationsMap)
-        self.walking = self.addCharState(
-            CharacterSM.Walking, animationsMap, CharacterSM.Idle)
-        self.running = self.addCharState(
-            CharacterSM.Running, animationsMap, CharacterSM.Idle)
+        self.idle = self.addAnimationState(CharacterSM.Idle, animationsMap)
+        self.inAir = self.addAnimationState(CharacterSM.InAir, animationsMap)
+        self.jumping = self.addAnimationState(CharacterSM.Jumping, animationsMap)
+        self.landing = self.addAnimationState(CharacterSM.Landing, animationsMap)
+        self.runLanding = self.addAnimationState(CharacterSM.RunLanding, animationsMap)
+        self.hardLanding = self.addAnimationState(CharacterSM.HardLanding, animationsMap)
+        self.sliding = self.addAnimationState(CharacterSM.Sliding, animationsMap)
+        self.walking = self.addAnimationState(CharacterSM.Walking, animationsMap)
+        self.running = self.addAnimationState(CharacterSM.Running, animationsMap)
 
-    def addCharState(self, state, animationsMap, targetState=None):
-        animation = animationsMap[state] if animationsMap != None else state
-        return self.addState(state, animation, targetState)
+        self.walking.addTimeTransition(0.1, CharacterSM.Idle)
+        self.running.addTimeTransition(0.1, CharacterSM.Idle)
+        self.jumping.addAnimationTransition(CharacterSM.InAir)
+        self.landing.addAnimationTransition(CharacterSM.Idle)
+        self.hardLanding.addAnimationTransition(CharacterSM.Idle)
+        self.runLanding.addAnimationTransition(CharacterSM.Idle)

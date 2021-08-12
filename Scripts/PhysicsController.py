@@ -34,20 +34,22 @@ class PhysicsController(cave.Component):
 
         self.ground = None
         self.groundChecker = None
-        self.onGround = False
+        self.isGrounded = True
         self.groundPosition = None
         self.groundAttriction = 0
         self.groundNormal = None
         self.verticalVelocity = 0
         self.direction = 0
+        self.onGround = []
+        self.onAir = []
         pass
 
     def jump(self, strength):
-        if self.onGround:
+        if self.isGrounded:
             self.verticalVelocity = strength
             self.ground = None
             self.groundChecker = None
-            self.onGround = False
+            self.isGrounded = False
             self.groundPosition = None
             self.groundAttriction = 0
             self.groundNormal = None
@@ -55,7 +57,7 @@ class PhysicsController(cave.Component):
         return False
 
     def move(self, direction):
-        if self.onGround:
+        if self.isGrounded:
             self.direction = direction
             return True
         return False
@@ -70,9 +72,10 @@ class PhysicsController(cave.Component):
         # Creates the ground collision checkers
         self.groundCheckers = []
         iterations = 19
-        step = 180/(iterations-1)
+        angleOffset = 30
+        step = (180-angleOffset*2)/(iterations-1)
         for i in range(iterations):
-            angle = 180 + i * step
+            angle = 180 + angleOffset + i * step
             self.groundCheckers.append(MathUtils.deg2vec(angle) * self.radius)
 
         # First ground update to initialize the current state
@@ -87,7 +90,7 @@ class PhysicsController(cave.Component):
         transform = self.entity.getTransform()
         scene = self.entity.getScene()
 
-        if self.onGround:
+        if self.isGrounded:
             self.updateMove(transform)
             self.updateSlide(transform)
         else:
@@ -116,15 +119,21 @@ class PhysicsController(cave.Component):
         if self.direction == 0:
             return
         groundAngle = MathUtils.angle(self.groundNormal)
-        directionAngleOffset = 90 if self.direction < 0 else -90
-        transform.position += MathUtils.deg2vec(
-            groundAngle + directionAngleOffset) * MathUtils.absolute(self.direction) * self.delta
+        entityAngle = 90 - (groundAngle if groundAngle <= 90 else 90 -
+                            (groundAngle - 90))
+        if entityAngle >= 0 and entityAngle < self.maxSlideAngle:
+            directionAngleOffset = 90 if self.direction < 0 else -90
+            transform.position += MathUtils.deg2vec(
+                groundAngle + directionAngleOffset) * MathUtils.absolute(self.direction) * self.delta
+
         self.direction = 0
 
     def updateGround(self, scene, transform):
+        lastIsGrounded = self.isGrounded
+        lastVelocity = self.verticalVelocity
         origin = transform.position + self.originOffset
         self.ground = None
-        self.onGround = False
+        self.isGrounded = False
         self.groundPosition = None
         self.groundAttriction = 0
         self.groundNormal = None
@@ -132,26 +141,33 @@ class PhysicsController(cave.Component):
         bestHitDistance = 999999
         for checker in self.groundCheckers:
             target = origin + checker
-            raycastOut = scene.rayCast(origin, target)
+            raycastOut = scene.rayCast(origin, target + cave.Vector3(0, -0.1, 0))
             if raycastOut.hit:
                 groundAngle = MathUtils.angle(raycastOut.normal)
                 entityAngle = 90 - (groundAngle if groundAngle <= 90 else 90 -
                                     (groundAngle - 90))
-                if entityAngle > 0:
+                if entityAngle >= 0 and entityAngle < self.maxSlideAngle:
                     self.verticalVelocity = 0
                     distance = cave.length(raycastOut.position - origin)
                     if distance < bestHitDistance:
                         bestHitDistance = distance
                         self.ground = raycastOut.entity
                         self.groundChecker = checker
-                        self.onGround = True
+                        self.isGrounded = True
                         self.groundPosition = cave.Vector3(
                             raycastOut.position.x, raycastOut.position.y, raycastOut.position.z)
                         self.groundAttriction = 0.5
                         self.groundNormal = cave.Vector3(
                             raycastOut.normal.x, raycastOut.normal.y, raycastOut.normal.z)
 
-        if self.onGround:
+        if lastIsGrounded and not self.isGrounded:
+            for callback in self.onAir:
+                callback()
+
+        if self.isGrounded:
+            if not lastIsGrounded:
+                for callback in self.onGround:
+                    callback(lastVelocity)
             targetPosition = self.groundPosition - \
                 self.groundChecker - self.originOffset
             if cave.length(transform.position - targetPosition) > 0.1:
