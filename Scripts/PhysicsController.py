@@ -27,9 +27,9 @@ class PhysicsController(cave.Component):
     def __init__(self):
         PhysicsController.instances.append(self)
         # Configurations
-        self.size = cave.Vector2(0.5, 2)
-        self.maxSlideAngle = 60
-        self.minSlideAngle = 30
+        self.size = cave.Vector2(0.5, 2)  # position.x, position.y
+        self.maxSlideAngle = 60  # scale.x
+        self.minSlideAngle = 30  # scale.y
         self.slideForce = 5
         self.grabDistance = 0.5
         self.grabCooldown = 0.5
@@ -241,7 +241,7 @@ class PhysicsController(cave.Component):
                 raycastOut = scene.rayCast(transform.position + checker, transform.position + checker + movement)
                 if raycastOut.hit:
                     for callback in self.onCollision:
-                        callback(raycastOut.entity, raycastOut.position, raycastOut.normal)
+                        callback(self.direction, raycastOut.entity, raycastOut.position, raycastOut.normal)
                     self.horizontalVelocity = 0
                     return True
             return False

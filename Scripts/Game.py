@@ -17,6 +17,7 @@ class Game(cave.Component):
         self.input = InputController.instances[0]
         self.character = CharacterController.instances[0]
         self.camera = CameraController.instances[0]
+        self.instructions = InstructionsController.instances[0]
         self.camera.setTarget(self.character.entity.getTransform(
         ), self.character.cameraLookTarget, self.character.cameraPosOffset)
 
@@ -36,4 +37,8 @@ class Game(cave.Component):
             else:
                 self.character.walk(1)
         if self.input.jump.start:
+            if self.instructions.isVisible:
+                self.instructions.hide()
+            else:
+                self.instructions.show('A', 'Correr', 'Shift')
             self.character.jump()

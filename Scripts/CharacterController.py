@@ -44,7 +44,8 @@ class CharacterController(cave.Component):
     def allowInput(self):
         return self.stateMachine.currentState != CharacterSM.HardLanding and \
             self.stateMachine.currentState != CharacterSM.SoftLanding and \
-            self.stateMachine.currentState != CharacterSM.Climbing
+            self.stateMachine.currentState != CharacterSM.Climbing and \
+            self.stateMachine.currentState != CharacterSM.Tripping
 
     def climb(self):
         if self.physics.climb():
@@ -111,6 +112,8 @@ class CharacterController(cave.Component):
             CharacterSM.Running:  'LauraRunning',
             CharacterSM.Grabbing:  'LauraGrabbing',
             CharacterSM.Climbing:  'LauraClimbing',
+            CharacterSM.Pushing:  'LauraPushing',
+            CharacterSM.Tripping:  'LauraTripping',
         }
 
     def end(self, scene):
@@ -123,10 +126,20 @@ class CharacterController(cave.Component):
         self.physics.onAir.append(lambda: self.onAir())
         self.physics.onGrab.append(lambda: self.onGrab())
         self.physics.onClimb.append(lambda: self.onClimb())
+        self.physics.onCollision.append(lambda d, e, p, n: self.onCollision(d, e, p, n))
         if self.physics.isGrounded:
             self.stateMachine.setState(CharacterSM.Idle)
         else:
             self.stateMachine.setState(CharacterSM.InAir)
+
+    def onCollision(self, direction, entity, position, normal):
+        if self.stateMachine.currentState == CharacterSM.Running and entity.hasTag('Obstacle'):
+            self.stateMachine.setState(CharacterSM.Tripping)
+            return
+        rigidBody = entity.get('Rigid Body Component')
+        self.stateMachine.setState(CharacterSM.Pushing)
+        if rigidBody != None:
+            rigidBody.applyImpulse(direction * 0.5, 0, 0, position)
 
     def onGrab(self):
         self.stateMachine.setState(CharacterSM.Grabbing)
@@ -298,6 +311,8 @@ class CharacterSM(StateMachine):
     Running = 'Running'
     Grabbing = 'Grabbing'
     Climbing = 'Climbing'
+    Pushing = 'Pushing'
+    Tripping = 'Tripping'
 
     def __init__(self, contextMesh=None, animationsMap=None):
         super().__init__(contextMesh)
@@ -313,13 +328,19 @@ class CharacterSM(StateMachine):
         self.running = self.addAnimationState(CharacterSM.Running, animationsMap)
         self.grabbing = self.addAnimationState(CharacterSM.Grabbing, animationsMap)
         self.climbing = self.addAnimationState(CharacterSM.Climbing, animationsMap)
+        self.pushing = self.addAnimationState(CharacterSM.Pushing, animationsMap)
+        self.tripping = self.addAnimationState(CharacterSM.Tripping, animationsMap)
 
         self.walking.addTimeTransition(0.1, CharacterSM.Idle)
         self.running.addTimeTransition(0.1, CharacterSM.Idle)
+        self.pushing.addTimeTransition(0.1, CharacterSM.Idle)
         self.jumping.addAnimationTransition(CharacterSM.InAir)
         self.landing.addAnimationTransition(CharacterSM.Idle)
         self.hardLanding.addAnimationTransition(CharacterSM.Idle)
         self.runLanding.addAnimationTransition(CharacterSM.Idle)
         self.climbing.addAnimationTransition(CharacterSM.Idle)
+        self.tripping.addAnimationTransition(CharacterSM.Idle)
+
+        self.pushing.onlyTransitionTo([CharacterSM.Idle])
         self.inAir.onlyTransitionTo([CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing])
         self.jumping.onlyTransitionTo([CharacterSM.InAir, CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing])
