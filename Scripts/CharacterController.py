@@ -45,6 +45,8 @@ class CharacterController(cave.Component):
         return self.stateMachine.currentState != CharacterSM.HardLanding and \
             self.stateMachine.currentState != CharacterSM.SoftLanding and \
             self.stateMachine.currentState != CharacterSM.Climbing and \
+            self.stateMachine.currentState != CharacterSM.Dead and \
+            self.stateMachine.currentState != CharacterSM.Dying and \
             self.stateMachine.currentState != CharacterSM.Tripping
 
     def climb(self):
@@ -114,6 +116,8 @@ class CharacterController(cave.Component):
             CharacterSM.Climbing:  'LauraClimbing',
             CharacterSM.Pushing:  'LauraPushing',
             CharacterSM.Tripping:  'LauraTripping',
+            CharacterSM.Dying:  'LauraDeathForward',
+            CharacterSM.Dead:  'LauraDead',
         }
 
     def end(self, scene):
@@ -122,7 +126,7 @@ class CharacterController(cave.Component):
 
     def firstUpdate(self):
         self.physics = PhysicsController.findFirstInEntity(self.entity)
-        self.physics.onGround.append(lambda v: self.onGround(v))
+        self.physics.onGround.append(lambda v, e: self.onGround(v, e))
         self.physics.onAir.append(lambda: self.onAir())
         self.physics.onGrab.append(lambda: self.onGrab())
         self.physics.onClimb.append(lambda: self.onClimb())
@@ -147,7 +151,11 @@ class CharacterController(cave.Component):
     def onClimb(self):
         self.stateMachine.setState(CharacterSM.Climbing)
 
-    def onGround(self, velocity):
+    def onGround(self, velocity, entity):
+        if entity.hasTag('Death'):
+            self.stateMachine.setState(CharacterSM.Dying)
+            return
+
         if velocity < self.hardFallSpeed:
             self.stateMachine.setState(CharacterSM.HardLanding)
         elif velocity < self.softFallSpeed:
@@ -313,6 +321,8 @@ class CharacterSM(StateMachine):
     Climbing = 'Climbing'
     Pushing = 'Pushing'
     Tripping = 'Tripping'
+    Dead = 'Dead'
+    Dying = 'Dying'
 
     def __init__(self, contextMesh=None, animationsMap=None):
         super().__init__(contextMesh)
@@ -330,6 +340,8 @@ class CharacterSM(StateMachine):
         self.climbing = self.addAnimationState(CharacterSM.Climbing, animationsMap)
         self.pushing = self.addAnimationState(CharacterSM.Pushing, animationsMap)
         self.tripping = self.addAnimationState(CharacterSM.Tripping, animationsMap)
+        self.dead = self.addAnimationState(CharacterSM.Dead, animationsMap)
+        self.dying = self.addAnimationState(CharacterSM.Dying, animationsMap)
 
         self.walking.addTimeTransition(0.1, CharacterSM.Idle)
         self.running.addTimeTransition(0.1, CharacterSM.Idle)
@@ -340,7 +352,10 @@ class CharacterSM(StateMachine):
         self.runLanding.addAnimationTransition(CharacterSM.Idle)
         self.climbing.addAnimationTransition(CharacterSM.Idle)
         self.tripping.addAnimationTransition(CharacterSM.Idle)
+        self.dying.addAnimationTransition(CharacterSM.Dead)
 
-        self.pushing.onlyTransitionTo([CharacterSM.Idle])
-        self.inAir.onlyTransitionTo([CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing])
-        self.jumping.onlyTransitionTo([CharacterSM.InAir, CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing])
+        self.dead.onlyTransitionTo([None])
+        self.dying.onlyTransitionTo([CharacterSM.Dead])
+        self.pushing.onlyTransitionTo([CharacterSM.Idle, CharacterSM.Dying])
+        self.inAir.onlyTransitionTo([CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])
+        self.jumping.onlyTransitionTo([CharacterSM.InAir, CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])

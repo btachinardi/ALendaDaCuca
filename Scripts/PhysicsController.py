@@ -35,7 +35,7 @@ class PhysicsController(cave.Component):
         self.grabCooldown = 0.5
         self.climbingTime = 1
 
-        self.ground = None
+        self.groundEntity = None
         self.groundChecker = None
         self.isGrounded = True
         self.isGrabbing = False
@@ -77,7 +77,7 @@ class PhysicsController(cave.Component):
 
         if self.isGrounded:
             self.verticalVelocity = strength
-            self.ground = None
+            self.groundEntity = None
             self.groundChecker = None
             self.isGrounded = False
             self.isGrabbing = False
@@ -280,7 +280,7 @@ class PhysicsController(cave.Component):
         lastIsGrounded = self.isGrounded
         lastVelocity = self.verticalVelocity
 
-        self.ground = None
+        self.groundEntity = None
         self.isGrounded = False
         self.groundPosition = None
         self.groundNormal = None
@@ -288,7 +288,7 @@ class PhysicsController(cave.Component):
         collision = self.checkCollisions(scene, self.groundCheckers, transform.position + self.groundOriginOffset, 0, self.maxSlideAngle)
         if collision != None:
             self.verticalVelocity = 0
-            self.ground = collision.entity
+            self.groundEntity = collision.entity
             self.groundChecker = collision.checker
             self.isGrounded = True
             self.groundPosition = collision.position
@@ -301,7 +301,7 @@ class PhysicsController(cave.Component):
         if self.isGrounded:
             if not lastIsGrounded:
                 for callback in self.onGround:
-                    callback(lastVelocity)
+                    callback(lastVelocity, self.groundEntity)
             transform.position = self.groundPosition - self.groundChecker - self.groundOriginOffset
 
 
