@@ -22,7 +22,10 @@ class CameraController(cave.Component):
         self.originalOffsetX = positionOffset.position.x
         self.originalLookX = lookTarget.position.x
 
-    def enterZone(self, distance, angle, positionX, lookX):
+    def enterZone(self, config):
+        self.enterZoneArgs(config['distance'], config['angle'], config['offset'], config['look'])
+
+    def enterZoneArgs(self, distance, angle, positionX, lookX):
         self.positionOffset.position.x = positionX
         self.lookTarget.position.x = lookX
         self.distance = distance

@@ -16,16 +16,24 @@ class Utils:
         Utils.printProperties(target)
         Utils.printMethods(target)
 
-    def processData(entity):
+    def globalPosition(entity, parentTransformList):
+        position = entity.getTransform().position
+        for parent in reversed(parentTransformList):
+            position += parent.position
+        return position
+
+    def processData(entity, parents=[]):
         result = {}
         children = entity.getChildren()
+
         if len(children) == 0:
-            return entity.name
+            return Utils.globalPosition(entity, parents) if 'waypoint' in entity.name.lower() else \
+                (entity.getTransform() if 'collider' in entity.name.lower() else entity.name)
 
         for child in children:
             splitName = child.name.split('=')
             if len(splitName) == 1:
-                result[splitName[0].strip()] = Utils.processData(child)
+                result[splitName[0].strip()] = Utils.processData(child, parents + [entity.getTransform()])
             elif len(splitName) == 2:
                 value = splitName[1].strip()
                 result[splitName[0].strip()] = Utils.floatTryParse(value)
@@ -35,7 +43,6 @@ class Utils:
     def updateTrigger(target):
         if not hasattr(target, 'data'):
             target.currentTarget = None
-            target.data = None
             target.data = Utils.processData(target.entity)
             return
 
@@ -43,7 +50,13 @@ class Utils:
         transform = target.entity.getTransform()
         pos = transform.position
         scale = transform.scale * 2
+        if 'collider' in target.data:
+            collider = target.data['collider']
+            pos = cave.Vector3(collider.position.x + pos.x, collider.position.y + pos.y, 0)
+            scale = cave.Vector3(collider.scale.x * scale.x, collider.scale.y * scale.y, 0)
+
         rect = Rect(pos.x - scale.x / 2, pos.y - scale.y / 2, scale.x, scale.y)
+
         for physics in PhysicsController.instances:
             isValid = False
             for tag in target.data['tags']:

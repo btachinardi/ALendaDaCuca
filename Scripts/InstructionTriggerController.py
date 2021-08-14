@@ -17,4 +17,4 @@ class InstructionTriggerController(cave.Component):
 
     def onEnterTrigger(self):
         config = self.data['instructions']
-        self.instructions.show(config['key'], config['text'], config['modifier'])
+        self.instructions.show(config)

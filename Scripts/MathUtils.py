@@ -36,6 +36,12 @@ class MathUtils:
         return MathUtils.rad2deg(math.atan2(target.y - origin.y, target.z - origin.z))
 
     """
+    Gets the angle around the Y axis between two vectors, this is the angle when you are looking from left to right
+    """
+    def angleBetweenZX(origin, target):
+        return 360 - MathUtils.rad2deg(math.atan2(target.z - origin.z, target.x - origin.x))
+
+    """
     Gets the vector that rotates around the Y axis with the target angle, resulting in X,Z components while Y is 0.
 
     Rotation always start at the right of the object (looking from down to up) and rotates counter-clockwise

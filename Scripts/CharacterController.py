@@ -28,6 +28,7 @@ class CharacterController(cave.Component):
         self.softFallSpeed = -12.5
         self.speed = 3
         self.runSpeed = 5
+        self.hidingSpeed = 5
         self.maxStamina = 10
         self.staminaReset = self.maxStamina * 0.75
         self.currentStamina = self.maxStamina
@@ -35,7 +36,6 @@ class CharacterController(cave.Component):
         self.staminaRunRate = 1.5
         self.staminaCoooldown = False
         self.jumpStrength = 10
-        self.rotateSmooth = 0.2
         self.isFirstUpdate = True
         self.direction = 0
         self.targetDirection = self.direction
@@ -47,6 +47,8 @@ class CharacterController(cave.Component):
             self.stateMachine.currentState != CharacterSM.Climbing and \
             self.stateMachine.currentState != CharacterSM.Dead and \
             self.stateMachine.currentState != CharacterSM.Dying and \
+            self.stateMachine.currentState != CharacterSM.Hiding and \
+            self.stateMachine.currentState != CharacterSM.Hidden and \
             self.stateMachine.currentState != CharacterSM.Tripping
 
     def climb(self):
@@ -63,6 +65,13 @@ class CharacterController(cave.Component):
 
         if self.physics.jump(self.jumpStrength):
             self.stateMachine.setState(CharacterSM.Jumping, 0.1)
+
+    def hide(self, waypoints):
+        def hideEnd():
+            self.stateMachine.setState(CharacterSM.Hidden)
+            self.physics.enabled = False
+        self.physics.animateSpeed(waypoints, self.hidingSpeed, hideEnd)
+        self.stateMachine.setState(CharacterSM.Hiding)
 
     def run(self, direction):
         if not self.allowInput():
@@ -118,6 +127,8 @@ class CharacterController(cave.Component):
             CharacterSM.Tripping:  'LauraTripping',
             CharacterSM.Dying:  'LauraDeathForward',
             CharacterSM.Dead:  'LauraDead',
+            CharacterSM.Hiding:  'LauraStealthWalk',
+            CharacterSM.Hidden:  'LauraCrouch',
         }
 
     def end(self, scene):
@@ -180,8 +191,6 @@ class CharacterController(cave.Component):
         if self.currentStamina > self.staminaReset:
             self.staminaCoooldown = False
 
-        self.direction = MathUtils.lerp(self.direction, self.targetDirection, self.rotateSmooth)
-        transform.lookAt(MathUtils.deg2vecXZ(self.direction))
         self.stateMachine.update(self.delta)
 
 
@@ -324,6 +333,8 @@ class CharacterSM(StateMachine):
     Tripping = 'Tripping'
     Dead = 'Dead'
     Dying = 'Dying'
+    Hiding = 'Hiding'
+    Hidden = 'Hidden'
 
     def __init__(self, contextMesh=None, animationsMap=None):
         super().__init__(contextMesh)
@@ -343,6 +354,8 @@ class CharacterSM(StateMachine):
         self.tripping = self.addAnimationState(CharacterSM.Tripping, animationsMap)
         self.dead = self.addAnimationState(CharacterSM.Dead, animationsMap)
         self.dying = self.addAnimationState(CharacterSM.Dying, animationsMap)
+        self.hiding = self.addAnimationState(CharacterSM.Hiding, animationsMap)
+        self.hidden = self.addAnimationState(CharacterSM.Hidden, animationsMap)
 
         self.walking.addTimeTransition(0.1, CharacterSM.Idle)
         self.running.addTimeTransition(0.1, CharacterSM.Idle)

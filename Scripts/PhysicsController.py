@@ -33,23 +33,25 @@ class PhysicsController(cave.Component):
         self.slideForce = 5
         self.grabDistance = 0.5
         self.grabCooldown = 0.5
-        self.climbingTime = 1
+        self.climbingTime = 1.5
         self.trippingTime = 0.75
         self.trippingDistance = 1.5
         self.trippingVelocity = 2
+        self.rotateSmooth = 0.2
 
         self.groundEntity = None
         self.groundChecker = None
         self.isGrounded = True
         self.isGrabbing = False
-        self.isClimbing = False
+        self.isAnimating = False
         self.isTripping = False
         self.groundPosition = None
         self.grabPosition = None
         self.groundNormal = None
         self.verticalVelocity = 0
         self.horizontalVelocity = 0
-        self.direction = 0
+        self.direction = cave.Vector3(1, 0, 0)
+        self.animationAngle = 0
         self.climbingProgress = 0
         self.currentGrabCooldown = 0
 
@@ -59,14 +61,44 @@ class PhysicsController(cave.Component):
         self.onCollision = []
         self.onTrip = []
         self.onAir = []
+        self.enabled = True
         pass
 
+    def animateSpeed(self, waypoints, speed, onAnimationComplete=None):
+        self.setupAnimate(waypoints, onAnimationComplete)
+        self.animatingTime = self.animationTotalDistance / speed
+
+    def animateTime(self, waypoints, time, onAnimationComplete=None):
+        self.setupAnimate(waypoints, onAnimationComplete)
+        self.animatingTime = time
+
+    def setupAnimate(self, waypoints, onAnimationComplete):
+        transform = self.entity.getTransform()
+        pos = transform.position
+        currentPosition = cave.Vector3(pos.x, pos.y, pos.z)
+        self.isAnimating = True
+        self.animatePoints = [currentPosition] + waypoints
+        self.animatePointsPos = []
+        self.animationPosition = 0
+        self.onAnimationComplete = onAnimationComplete
+
+        totalDistance = 0
+        lastPoint = currentPosition
+        for point in waypoints:
+            distance = cave.length(point - lastPoint)
+            totalDistance += distance
+            self.animatePointsPos.append(totalDistance)
+        self.animatePointsPosNorm = [x / totalDistance for x in self.animatePointsPos]
+        self.animationTotalDistance = totalDistance
+
     def startClimbing(self):
-        if self.isClimbing or not self.isGrabbing:
+        if self.isAnimating or not self.isGrabbing:
             return
 
-        self.isClimbing = True
-        self.climbingProgress = 0
+        def finishAnimation():
+            self.isGrabbing = False
+
+        self.animateTime([self.grabPosition], self.climbingTime, finishAnimation)
         for callback in self.onClimb:
             callback()
 
@@ -94,15 +126,18 @@ class PhysicsController(cave.Component):
 
     def move(self, velocity):
         if self.isGrabbing:
-            if velocity > 0 and self.direction > 0:
+            if velocity > 0 and self.direction.x > 0:
                 self.startClimbing()
-            elif velocity < 0 and self.direction < 0:
+            elif velocity < 0 and self.direction.x < 0:
                 self.startClimbing()
             else:
                 self.stopGrabbing()
             return
 
-        self.direction = 1 if velocity > 0 else -1
+        self.direction.x = 1 if velocity > 0 else -1
+        self.direction.y = 0
+        self.direction.z = 0
+
         if self.isGrounded:
             self.horizontalVelocity = velocity
         elif self.horizontalVelocity != 0:
@@ -154,12 +189,17 @@ class PhysicsController(cave.Component):
             PhysicsController.instances.remove(self)
 
     def update(self):
+        if not self.enabled:
+            return
+
         self.delta = cave.getDeltaTime()
         transform = self.entity.getTransform()
         scene = self.entity.getScene()
 
-        if self.isGrabbing:
-            self.updateClimbing(transform)
+        if self.isAnimating:
+            self.updateAnimating(transform)
+        elif self.isGrabbing:
+            pass
         elif self.isTripping:
             self.updateTripping(transform)
         else:
@@ -175,6 +215,17 @@ class PhysicsController(cave.Component):
             else:
                 self.updateTop(scene, transform)
 
+        targetAngle = MathUtils.angleBetweenZX(cave.Vector3(0, 0, 0), self.direction)
+        if targetAngle < 0:
+            targetAngle += 360
+        if targetAngle > 360:
+            targetAngle -= 360
+
+        self.animationAngle = MathUtils.lerp(self.animationAngle, targetAngle, self.rotateSmooth)
+        euler = transform.getEuler()
+        euler.y = self.animationAngle
+        transform.setEuler(euler)
+
     def updateTripping(self, transform):
         if self.isTripping:
             self.trippingProgress = MathUtils.clamp01(self.trippingProgress + self.delta / self.trippingTime)
@@ -182,13 +233,29 @@ class PhysicsController(cave.Component):
             if self.trippingProgress >= 1:
                 self.isTripping = False
 
-    def updateClimbing(self, transform):
-        if self.isClimbing:
-            self.climbingProgress = MathUtils.clamp01(self.climbingProgress + self.delta / self.climbingTime)
-            transform.position = MathUtils.lerp(self.grabStartPosition, self.grabPosition, self.climbingProgress)
-            if self.climbingProgress >= 1:
-                self.isClimbing = False
-                self.isGrabbing = False
+    def updateAnimating(self, transform):
+        if self.isAnimating:
+            self.animationPosition = MathUtils.clamp(0, self.animationTotalDistance, self.animationPosition +
+                                                     (self.animationTotalDistance / self.animatingTime) * self.delta)
+            currentIndex = 0
+            for pos in self.animatePointsPos:
+                if pos >= self.animationPosition:
+                    break
+                currentIndex += 1
+
+            pointA = self.animatePoints[currentIndex]
+            pointB = self.animatePoints[currentIndex + 1]
+            pointAPos = 0 if currentIndex == 0 else self.animatePointsPos[currentIndex - 1]
+            pointBPos = self.animatePointsPos[currentIndex]
+
+            self.direction = pointB - pointA
+            self.direction.y = 0
+            transform.position = MathUtils.lerp(pointA, pointB, (self.animationPosition - pointAPos) / (pointBPos - pointAPos))
+
+            if self.animationPosition >= self.animationTotalDistance:
+                self.isAnimating = False
+                if self.onAnimationComplete != None:
+                    self.onAnimationComplete()
 
     def updateSlide(self, scene, transform):
         groundAngle = MathUtils.angle(self.groundNormal)
@@ -209,11 +276,11 @@ class PhysicsController(cave.Component):
 
         origin = transform.position + self.topOriginOffset
         origin.y += self.radius
-        target = cave.Vector3(origin.x + (self.radius * self.direction * 1.5), origin.y, origin.z)
+        target = cave.Vector3(origin.x + (self.radius * self.direction.x * 1.5), origin.y, origin.z)
         raycastOut = scene.rayCast(origin, target)
         if raycastOut.hit:
-            topRaycastOut = scene.rayCast(raycastOut.position + cave.Vector3(self.direction * 0.1, self.grabDistance, 0),
-                                          raycastOut.position + cave.Vector3(self.direction * 0.1, 0, 0))
+            topRaycastOut = scene.rayCast(raycastOut.position + cave.Vector3(self.direction.x * 0.1, self.grabDistance, 0),
+                                          raycastOut.position + cave.Vector3(self.direction.x * 0.1, 0, 0))
             if topRaycastOut.hit:
                 self.isGrabbing = True
                 self.verticalVelocity = 0
@@ -221,7 +288,7 @@ class PhysicsController(cave.Component):
                 self.climbingProgress = 0
                 self.isClimbing = False
                 self.grabPosition = cave.Vector3(topRaycastOut.position.x, topRaycastOut.position.y, topRaycastOut.position.z)
-                self.grabStartPosition = cave.Vector3(self.grabPosition.x + ((self.radius + 0.1) * -self.direction),
+                self.grabStartPosition = cave.Vector3(self.grabPosition.x + ((self.radius + 0.1) * -self.direction.x),
                                                       self.grabPosition.y - self.size.y - self.grabDistance, topRaycastOut.position.z)
                 transform.position = self.grabStartPosition
                 for callback in self.onGrab:
@@ -259,12 +326,12 @@ class PhysicsController(cave.Component):
                         self.isTripping = True
                         self.trippingProgress = 0
                         self.tripStartPosition = cave.Vector3(transform.position.x, transform.position.y, transform.position.z)
-                        self.tripPosition = self.tripStartPosition + cave.Vector3(self.trippingDistance * self.direction, 0, 0)
+                        self.tripPosition = self.tripStartPosition + cave.Vector3(self.trippingDistance * self.direction.x, 0, 0)
                         for callback in self.onTrip:
                             callback()
                     else:
                         for callback in self.onCollision:
-                            callback(self.direction, raycastOut.entity, raycastOut.position, raycastOut.normal)
+                            callback(self.direction.x, raycastOut.entity, raycastOut.position, raycastOut.normal)
                     self.horizontalVelocity = 0
                     return True
             return False

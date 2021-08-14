@@ -32,7 +32,10 @@ class InstructionsController(cave.Component):
             if child.name == 'Instruction Text':
                 self.instruction = child.get('UI Element Component')
 
-    def show(self, keyText, instructionText, modifierText=None):
+    def show(self, config):
+        self.showArgs(config['key'], config['text'], config['modifier'])
+
+    def showArgs(self, keyText, instructionText, modifierText):
 
         if modifierText == 'None' or modifierText == 'none':
             modifierText = None

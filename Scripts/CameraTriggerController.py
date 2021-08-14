@@ -17,4 +17,4 @@ class CameraTriggerController(cave.Component):
 
     def onEnterTrigger(self):
         config = self.data['camera']
-        self.camera.enterZone(config['distance'], config['angle'], config['offset'], config['look'])
+        self.camera.enterZone(config)
