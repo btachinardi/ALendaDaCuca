@@ -66,10 +66,24 @@ class CharacterController(cave.Component):
         if self.physics.jump(self.jumpStrength):
             self.stateMachine.setState(CharacterSM.Jumping, 0.1)
 
-    def hide(self, waypoints):
+    def show(self, waypoints, onShowEnd):
+        def showEnd():
+            self.stateMachine.setState(CharacterSM.Idle)
+            self.physics.move(self.direction * self.speed)
+            if onShowEnd != None:
+                onShowEnd()
+
+        self.physics.enabled = True
+        self.physics.animateSpeed(waypoints, self.hidingSpeed, showEnd)
+        self.stateMachine.setState(CharacterSM.Hiding)
+
+    def hide(self, waypoints, onHideEnd):
         def hideEnd():
             self.stateMachine.setState(CharacterSM.Hidden)
             self.physics.enabled = False
+            if onHideEnd != None:
+                onHideEnd()
+
         self.physics.animateSpeed(waypoints, self.hidingSpeed, hideEnd)
         self.stateMachine.setState(CharacterSM.Hiding)
 
@@ -124,6 +138,7 @@ class CharacterController(cave.Component):
             CharacterSM.Grabbing:  'LauraGrabbing',
             CharacterSM.Climbing:  'LauraClimbing',
             CharacterSM.Pushing:  'LauraPushing',
+            CharacterSM.PushingHeavy:  'LauraPushingHeavy',
             CharacterSM.Tripping:  'LauraTripping',
             CharacterSM.Dying:  'LauraDeathForward',
             CharacterSM.Dead:  'LauraDead',
@@ -153,9 +168,11 @@ class CharacterController(cave.Component):
 
     def onCollision(self, direction, entity, position, normal):
         rigidBody = entity.get('Rigid Body Component')
-        self.stateMachine.setState(CharacterSM.Pushing)
-        if rigidBody != None:
+        if rigidBody != None and entity.hasTag('Pushable'):
             rigidBody.applyImpulse(direction * 0.5, 0, 0, position)
+            self.stateMachine.setState(CharacterSM.Pushing)
+        else:
+            self.stateMachine.setState(CharacterSM.PushingHeavy)
 
     def onGrab(self):
         self.stateMachine.setState(CharacterSM.Grabbing)
@@ -330,6 +347,7 @@ class CharacterSM(StateMachine):
     Grabbing = 'Grabbing'
     Climbing = 'Climbing'
     Pushing = 'Pushing'
+    PushingHeavy = 'PushingHeavy'
     Tripping = 'Tripping'
     Dead = 'Dead'
     Dying = 'Dying'
@@ -351,6 +369,7 @@ class CharacterSM(StateMachine):
         self.grabbing = self.addAnimationState(CharacterSM.Grabbing, animationsMap)
         self.climbing = self.addAnimationState(CharacterSM.Climbing, animationsMap)
         self.pushing = self.addAnimationState(CharacterSM.Pushing, animationsMap)
+        self.pushingHeavy = self.addAnimationState(CharacterSM.PushingHeavy, animationsMap)
         self.tripping = self.addAnimationState(CharacterSM.Tripping, animationsMap)
         self.dead = self.addAnimationState(CharacterSM.Dead, animationsMap)
         self.dying = self.addAnimationState(CharacterSM.Dying, animationsMap)
@@ -360,6 +379,7 @@ class CharacterSM(StateMachine):
         self.walking.addTimeTransition(0.1, CharacterSM.Idle)
         self.running.addTimeTransition(0.1, CharacterSM.Idle)
         self.pushing.addTimeTransition(0.1, CharacterSM.Idle)
+        self.pushingHeavy.addTimeTransition(0.1, CharacterSM.Idle)
         self.jumping.addAnimationTransition(CharacterSM.InAir)
         self.landing.addAnimationTransition(CharacterSM.Idle)
         self.hardLanding.addAnimationTransition(CharacterSM.Idle)
@@ -371,5 +391,6 @@ class CharacterSM(StateMachine):
         self.dead.onlyTransitionTo([None])
         self.dying.onlyTransitionTo([CharacterSM.Dead])
         self.pushing.onlyTransitionTo([CharacterSM.Idle, CharacterSM.Dying])
+        self.pushingHeavy.onlyTransitionTo([CharacterSM.Idle, CharacterSM.Dying])
         self.inAir.onlyTransitionTo([CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])
         self.jumping.onlyTransitionTo([CharacterSM.InAir, CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])

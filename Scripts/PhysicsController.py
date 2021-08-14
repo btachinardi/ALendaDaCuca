@@ -34,10 +34,10 @@ class PhysicsController(cave.Component):
         self.grabDistance = 0.5
         self.grabCooldown = 0.5
         self.climbingTime = 1.5
-        self.trippingTime = 0.75
-        self.trippingDistance = 1.5
+        self.trippingTime = 1
+        self.trippingDistance = 2
         self.trippingVelocity = 2
-        self.rotateSmooth = 0.2
+        self.rotateSmooth = 0.1
 
         self.groundEntity = None
         self.groundChecker = None
