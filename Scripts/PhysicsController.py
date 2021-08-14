@@ -34,12 +34,16 @@ class PhysicsController(cave.Component):
         self.grabDistance = 0.5
         self.grabCooldown = 0.5
         self.climbingTime = 1
+        self.trippingTime = 0.75
+        self.trippingDistance = 1.5
+        self.trippingVelocity = 2
 
         self.groundEntity = None
         self.groundChecker = None
         self.isGrounded = True
         self.isGrabbing = False
         self.isClimbing = False
+        self.isTripping = False
         self.groundPosition = None
         self.grabPosition = None
         self.groundNormal = None
@@ -53,6 +57,7 @@ class PhysicsController(cave.Component):
         self.onClimb = []
         self.onGround = []
         self.onCollision = []
+        self.onTrip = []
         self.onAir = []
         pass
 
@@ -81,6 +86,7 @@ class PhysicsController(cave.Component):
             self.groundChecker = None
             self.isGrounded = False
             self.isGrabbing = False
+            self.isTripping = False
             self.groundPosition = None
             self.groundNormal = None
             return True
@@ -154,6 +160,8 @@ class PhysicsController(cave.Component):
 
         if self.isGrabbing:
             self.updateClimbing(transform)
+        elif self.isTripping:
+            self.updateTripping(transform)
         else:
             if self.isGrounded:
                 self.updateMove(scene, transform)
@@ -166,6 +174,13 @@ class PhysicsController(cave.Component):
                 self.updateGround(scene, transform)
             else:
                 self.updateTop(scene, transform)
+
+    def updateTripping(self, transform):
+        if self.isTripping:
+            self.trippingProgress = MathUtils.clamp01(self.trippingProgress + self.delta / self.trippingTime)
+            transform.position = MathUtils.lerp(self.tripStartPosition, self.tripPosition, self.trippingProgress)
+            if self.trippingProgress >= 1:
+                self.isTripping = False
 
     def updateClimbing(self, transform):
         if self.isClimbing:
@@ -240,8 +255,16 @@ class PhysicsController(cave.Component):
             for checker in checkers:
                 raycastOut = scene.rayCast(transform.position + checker, transform.position + checker + movement)
                 if raycastOut.hit:
-                    for callback in self.onCollision:
-                        callback(self.direction, raycastOut.entity, raycastOut.position, raycastOut.normal)
+                    if MathUtils.absolute(self.horizontalVelocity) >= self.trippingVelocity and raycastOut.entity.hasTag('Obstacle'):
+                        self.isTripping = True
+                        self.trippingProgress = 0
+                        self.tripStartPosition = cave.Vector3(transform.position.x, transform.position.y, transform.position.z)
+                        self.tripPosition = self.tripStartPosition + cave.Vector3(self.trippingDistance * self.direction, 0, 0)
+                        for callback in self.onTrip:
+                            callback()
+                    else:
+                        for callback in self.onCollision:
+                            callback(self.direction, raycastOut.entity, raycastOut.position, raycastOut.normal)
                     self.horizontalVelocity = 0
                     return True
             return False

@@ -34,6 +34,9 @@ class InstructionsController(cave.Component):
 
     def show(self, keyText, instructionText, modifierText=None):
 
+        if modifierText == 'None' or modifierText == 'none':
+            modifierText = None
+
         self.isVisible = True
         self.targetPosition = self.showPosition
         self.isAnimating = True

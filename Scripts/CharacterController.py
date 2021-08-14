@@ -130,16 +130,17 @@ class CharacterController(cave.Component):
         self.physics.onAir.append(lambda: self.onAir())
         self.physics.onGrab.append(lambda: self.onGrab())
         self.physics.onClimb.append(lambda: self.onClimb())
+        self.physics.onTrip.append(lambda: self.onTrip())
         self.physics.onCollision.append(lambda d, e, p, n: self.onCollision(d, e, p, n))
         if self.physics.isGrounded:
             self.stateMachine.setState(CharacterSM.Idle)
         else:
             self.stateMachine.setState(CharacterSM.InAir)
 
+    def onTrip(self):
+        self.stateMachine.setState(CharacterSM.Tripping)
+
     def onCollision(self, direction, entity, position, normal):
-        if self.stateMachine.currentState == CharacterSM.Running and entity.hasTag('Obstacle'):
-            self.stateMachine.setState(CharacterSM.Tripping)
-            return
         rigidBody = entity.get('Rigid Body Component')
         self.stateMachine.setState(CharacterSM.Pushing)
         if rigidBody != None:

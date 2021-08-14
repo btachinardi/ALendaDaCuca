@@ -37,8 +37,4 @@ class Game(cave.Component):
             else:
                 self.character.walk(1)
         if self.input.jump.start:
-            if self.instructions.isVisible:
-                self.instructions.hide()
-            else:
-                self.instructions.show('A', 'Correr', 'Shift')
             self.character.jump()
