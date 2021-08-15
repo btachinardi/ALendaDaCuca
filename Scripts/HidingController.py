@@ -2,16 +2,17 @@ import cave
 
 
 class HidingController(cave.Component):
+
     def start(self, scene):
-        self.firstUpdate = True
+        GameController.onInitialized(lambda: self.initialize())
+
+    def initialize(self):
+        self.player = GameController.player
+        self.instructions = GameController.instructions
+        self.camera = GameController.camera
+        self.game = GameController.instance
 
     def update(self):
-        if self.firstUpdate:
-            self.firstUpdate = False
-            self.player = CharacterController.instances[0]
-            self.instructions = InstructionsController.instances[0]
-            self.camera = CameraController.instances[0]
-            self.game = GameController.instances[0]
         Utils.updateTrigger(self)
 
     def end(self, scene):

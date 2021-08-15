@@ -2,10 +2,8 @@ import cave
 
 
 class InstructionsController(cave.Component):
-    instances = []
 
-    def __init__(self):
-        InstructionsController.instances.append(self)
+    def start(self, scene):
         self.isVisible = False
         self.isAnimating = False
         self.keyText = None
@@ -15,8 +13,6 @@ class InstructionsController(cave.Component):
         self.verticalPosition = 0
         self.showPosition = 75
         self.hidePosition = 0
-
-    def start(self, scene):
         self.transform = self.entity.get('UI Element Component')
         self.transform.position.setPixelY(int(self.hidePosition))
         self.verticalPosition = self.hidePosition

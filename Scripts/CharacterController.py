@@ -1,45 +1,8 @@
+from random import random
 import cave
 
 
 class CharacterController(cave.Component):
-    instances = []
-
-    def findFirstInEntity(entity):
-        return next(filter(lambda i: i.entity == entity, CharacterController.instances))
-
-    def findFirstByName(name):
-        return next(filter(lambda i: i.entity.name == name, CharacterController.instances))
-
-    def findFirstByTag(tag):
-        return next(filter(lambda i: i.entity.hasTag(tag), CharacterController.instances))
-
-    def findInEntity(entity):
-        return filter(lambda i: i.entity == entity, CharacterController.instances)
-
-    def findByName(name):
-        return filter(lambda i: i.entity.name == name, CharacterController.instances)
-
-    def findByTag(tag):
-        return filter(lambda i: i.entity.hasTag(tag), CharacterController.instances)
-
-    def __init__(self):
-        CharacterController.instances.append(self)
-        self.hardFallSpeed = -20
-        self.softFallSpeed = -12.5
-        self.speed = 3
-        self.runSpeed = 5
-        self.hidingSpeed = 5
-        self.maxStamina = 10
-        self.staminaReset = self.maxStamina * 0.75
-        self.currentStamina = self.maxStamina
-        self.staminaRecoveryRate = 0.5
-        self.staminaRunRate = 1.5
-        self.staminaCoooldown = False
-        self.jumpStrength = 10
-        self.isFirstUpdate = True
-        self.direction = 0
-        self.targetDirection = self.direction
-        self.delta = 0
 
     def allowInput(self):
         return self.stateMachine.currentState != CharacterSM.HardLanding and \
@@ -112,6 +75,21 @@ class CharacterController(cave.Component):
             self.stateMachine.setState(CharacterSM.Walking, 0.1)
 
     def start(self, scene):
+        self.hardFallSpeed = -20
+        self.softFallSpeed = -12.5
+        self.speed = 3
+        self.runSpeed = 5
+        self.hidingSpeed = 5
+        self.maxStamina = 10
+        self.staminaReset = self.maxStamina * 0.75
+        self.currentStamina = self.maxStamina
+        self.staminaRecoveryRate = 0.5
+        self.staminaRunRate = 1.5
+        self.staminaCoooldown = False
+        self.jumpStrength = 10
+        self.direction = 0
+        self.targetDirection = self.direction
+        self.delta = 0
         children = self.entity.getChildren()
         for child in children:
             if child.hasTag('Camera Look Target'):
@@ -123,6 +101,19 @@ class CharacterController(cave.Component):
 
         self.viewMesh = self.view.get('Mesh Component')
         self.stateMachine = CharacterSM(self.viewMesh, self.getAnimationMap())
+
+        # Initializes physics callbacks
+        self.physics = self.entity.get('PhysicsController')
+        self.physics.onGround.append(lambda v, e: self.onGround(v, e))
+        self.physics.onAir.append(lambda: self.onAir())
+        self.physics.onGrab.append(lambda: self.onGrab())
+        self.physics.onClimb.append(lambda: self.onClimb())
+        self.physics.onTrip.append(lambda: self.onTrip())
+        self.physics.onCollision.append(lambda d, e, p, n: self.onCollision(d, e, p, n))
+        if self.physics.isGrounded:
+            self.stateMachine.setState(CharacterSM.Idle)
+        else:
+            self.stateMachine.setState(CharacterSM.InAir)
 
     def getAnimationMap(self):
         return {
@@ -147,21 +138,7 @@ class CharacterController(cave.Component):
         }
 
     def end(self, scene):
-        if self in CharacterController.instances:
-            CharacterController.instances.remove(self)
-
-    def firstUpdate(self):
-        self.physics = PhysicsController.findFirstInEntity(self.entity)
-        self.physics.onGround.append(lambda v, e: self.onGround(v, e))
-        self.physics.onAir.append(lambda: self.onAir())
-        self.physics.onGrab.append(lambda: self.onGrab())
-        self.physics.onClimb.append(lambda: self.onClimb())
-        self.physics.onTrip.append(lambda: self.onTrip())
-        self.physics.onCollision.append(lambda d, e, p, n: self.onCollision(d, e, p, n))
-        if self.physics.isGrounded:
-            self.stateMachine.setState(CharacterSM.Idle)
-        else:
-            self.stateMachine.setState(CharacterSM.InAir)
+        pass
 
     def onTrip(self):
         self.stateMachine.setState(CharacterSM.Tripping)
@@ -196,14 +173,104 @@ class CharacterController(cave.Component):
         self.stateMachine.setState(CharacterSM.InAir)
 
     def update(self):
-        if self.isFirstUpdate:
-            self.isFirstUpdate = False
-            self.firstUpdate()
-        transform = self.entity.getTransform()
 
         self.delta = cave.getDeltaTime()
-        self.currentStamina = MathUtils.clamp(
-            0, self.maxStamina, self.currentStamina + self.staminaRecoveryRate * self.delta)
+        self.currentStamina = MathUtils.clamp(0, self.maxStamina, self.currentStamina + self.staminaRecoveryRate * self.delta)
+
+        if self.currentStamina > self.staminaReset:
+            self.staminaCoooldown = False
+
+        self.stateMachine.update(self.delta)
+
+
+class EnemyController(cave.Component):
+
+    def run(self, direction):
+        if self.staminaCoooldown:
+            self.walk(direction)
+            return
+
+        self.targetDirection = 180 if direction > 0 else 0
+        if self.physics.move(direction * self.runSpeed):
+            self.currentStamina -= self.staminaRunRate * self.delta
+            if self.currentStamina <= 0:
+                self.currentStamina = 0
+                self.staminaCoooldown = True
+
+    def walk(self, direction):
+        self.targetDirection = 180 if direction > 0 else 0
+        self.physics.move(direction * self.speed)
+
+    def start(self, scene):
+        self.speed = 2
+        self.runSpeed = 6
+        self.maxStamina = 5
+        self.staminaReset = self.maxStamina * 0.75
+        self.currentStamina = self.maxStamina
+        self.staminaRecoveryRate = 0.5
+        self.staminaRunRate = 1.5
+        self.staminaCoooldown = False
+        self.isFirstUpdate = True
+        self.direction = 0
+        self.targetDirection = self.direction
+        self.delta = 0
+        children = self.entity.getChildren()
+        for child in children:
+            if child.hasTag('View'):
+                self.view = child
+
+        self.physics = self.entity.get('PhysicsController')
+        self.viewMesh = self.view.get('Mesh Component')
+        self.stateMachine = EnemySM(self.viewMesh, self.getAnimationMap())
+
+        self.stateMachine.patrolling.onUpdate.append(lambda s: self.onPatrolling(s))
+        self.stateMachine.idle.onUpdate.append(lambda s: self.onIdle(s))
+
+        self.waypoints = Utils.getWaypoints(self.entity.getScene(), 'patrol_waypoints')
+        self.goto(0)
+
+    def onPatrolling(self, state):
+        posX = self.entity.getTransform().position.x
+        targetX = self.currentWaypoint.x
+
+        if MathUtils.absolute(posX - targetX) < 0.2:
+            self.waitTime = random() * 3 + 2
+            self.stateMachine.setState(EnemySM.Idle)
+        else:
+            self.direction = -1 if posX > targetX else 1
+            self.walk(self.direction)
+
+    def onIdle(self, state):
+        self.waitTime -= self.delta
+        if self.waitTime <= 0:
+            nextIndex = self.currentWaypointIndex
+            if self.currentWaypointIndex > 0 and random() > 0.5:
+                nextIndex -= 1
+            else:
+                nextIndex += 1
+            self.goto(nextIndex)
+
+    def goto(self, waypointIndex):
+        self.currentWaypointIndex = waypointIndex
+        self.currentWaypoint = self.waypoints[waypointIndex]
+        self.stateMachine.setState(EnemySM.Patrolling)
+
+    def getAnimationMap(self):
+        return {
+            EnemySM.Idle:  'CurupiraMinionIdle',
+            EnemySM.Patrolling:  'CurupiraMinionWalk',
+            EnemySM.Running:  'CurupiraMinionRunning',
+            EnemySM.Alert:  'CurupiraMinionAlert',
+            EnemySM.LookAround:  'CurupiraMinionLookAround',
+        }
+
+    def end(self, scene):
+        pass
+
+    def update(self):
+
+        self.delta = cave.getDeltaTime()
+        self.currentStamina = MathUtils.clamp(0, self.maxStamina, self.currentStamina + self.staminaRecoveryRate * self.delta)
 
         if self.currentStamina > self.staminaReset:
             self.staminaCoooldown = False
@@ -218,10 +285,16 @@ class State:
         self.contextMesh = contextMesh
         self.transitions = []
         self.transitionsAllowed = []
+        self.onUpdate = []
+        self.onEnter = []
+        self.onExit = []
         self.time = 0
 
     def update(self, delta):
         self.time += delta
+        for callback in self.onUpdate:
+            callback(self)
+
         for transition in self.transitions:
             result = transition.update()
             if result != None:
@@ -233,14 +306,22 @@ class State:
 
     def enter(self, blendTime):
         self.time = 0
+
         for transition in self.transitions:
             transition.enter()
+
         if self.animation != None and self.contextMesh != None:
             self.contextMesh.setAnimation(self.animation, blendTime)
+
+        for callback in self.onEnter:
+            callback(self)
 
     def exit(self):
         for transition in self.transitions:
             transition.exit()
+
+        for callback in self.onExit:
+            callback(self)
 
     def addTransition(self, checker, blendTime=0.25, priority=0):
         self.transitions.append(StateTransition(checker, blendTime, priority))
@@ -334,6 +415,23 @@ class StateMachine:
                 self.states[self.currentState].reset()
 
 
+class EnemySM(StateMachine):
+    Idle = 'Idle'
+    Patrolling = 'Patrolling'
+    Running = 'Running'
+    Alert = 'Alert'
+    LookAround = 'LookAround'
+
+    def __init__(self, contextMesh=None, animationsMap=None):
+        super().__init__(contextMesh)
+
+        self.idle = self.addAnimationState(EnemySM.Idle, animationsMap)
+        self.patrolling = self.addAnimationState(EnemySM.Patrolling, animationsMap)
+        self.running = self.addAnimationState(EnemySM.Running, animationsMap)
+        self.alert = self.addAnimationState(EnemySM.Alert, animationsMap)
+        self.lookAround = self.addAnimationState(EnemySM.LookAround, animationsMap)
+
+
 class CharacterSM(StateMachine):
     Idle = 'Idle'
     InAir = 'Air'
@@ -353,6 +451,7 @@ class CharacterSM(StateMachine):
     Dying = 'Dying'
     Hiding = 'Hiding'
     Hidden = 'Hidden'
+    Alert = 'Alert'
 
     def __init__(self, contextMesh=None, animationsMap=None):
         super().__init__(contextMesh)
@@ -390,8 +489,8 @@ class CharacterSM(StateMachine):
 
         self.dead.onlyTransitionTo([None])
         self.dying.onlyTransitionTo([CharacterSM.Dead])
-        self.pushing.onlyTransitionTo([CharacterSM.Idle, CharacterSM.Dying])
-        self.pushingHeavy.onlyTransitionTo([CharacterSM.Idle, CharacterSM.Dying])
+        self.pushing.onlyTransitionTo([CharacterSM.Idle, CharacterSM.Dying, CharacterSM.Grabbing, CharacterSM.InAir])
+        self.pushingHeavy.onlyTransitionTo([CharacterSM.Idle, CharacterSM.Dying, CharacterSM.Grabbing, CharacterSM.InAir])
         self.inAir.onlyTransitionTo([CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])
         self.jumping.onlyTransitionTo([CharacterSM.InAir, CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])
 

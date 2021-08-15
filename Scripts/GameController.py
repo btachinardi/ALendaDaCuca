@@ -2,13 +2,19 @@ import cave
 
 
 class GameController(cave.Component):
-    instances = []
+    instance = None
+    input = None
+    player = None
+    camera = None
+    instructions = None
+    onInitializedCallback = []
+    isInitialized = False
 
-    def __init__(self):
-        GameController.instances.append(self)
-        self.isFirstUpdate = True
-        self.currentInteractable = None
-        pass
+    def onInitialized(callback):
+        if GameController.isInitialized:
+            callback()
+        else:
+            GameController.onInitializedCallback.append(callback)
 
     def setInteractable(self, target):
         self.currentInteractable = target
@@ -16,36 +22,41 @@ class GameController(cave.Component):
     def clearInteractable(self):
         self.currentInteractable = None
 
-    def start(self, scene):
-        pass
-
     def end(self, scene):
         pass
 
+    def start(self, scene):
+        print('Start')
+        self.currentInteractable = None
+
     def firstUpdate(self):
-        self.input = InputController.instances[0]
-        self.character = CharacterController.instances[0]
-        self.camera = CameraController.instances[0]
-        self.instructions = InstructionsController.instances[0]
-        self.camera.setTarget(self.character.entity.getTransform(), self.character.cameraLookTarget, self.character.cameraPosOffset)
+        scene = self.entity.getScene()
+        GameController.instance = self
+        GameController.input = scene.getEntity('Input').get('InputController')
+        GameController.player = scene.getEntity('Player Character').get('CharacterController')
+        GameController.camera = scene.getEntity('Camera').get('CameraController')
+        GameController.instructions = scene.getEntity('Instructions').get('InstructionsController')
+        GameController.camera.setTarget(GameController.player.entity.getTransform(), GameController.player.cameraLookTarget, GameController.player.cameraPosOffset)
+        GameController.isInitialized = True
+        for callback in GameController.onInitializedCallback:
+            callback()
 
     def update(self):
-        if self.isFirstUpdate:
-            self.isFirstUpdate = False
-            self.firstUpdate()
 
         if self.input.left.active:
             if self.input.shift.active:
-                self.character.run(-1)
+                self.player.run(-1)
             else:
-                self.character.walk(-1)
+                self.player.walk(-1)
         if self.input.right.active:
             if self.input.shift.active:
-                self.character.run(1)
+                self.player.run(1)
             else:
-                self.character.walk(1)
+                self.player.walk(1)
+
         if self.input.jump.start:
-            self.character.jump()
+            cave.playSound('Train Whistle', 0.5)
+            self.player.jump()
 
         if self.input.interact.start:
             if self.currentInteractable != None:

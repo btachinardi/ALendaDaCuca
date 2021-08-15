@@ -6,7 +6,7 @@ class CameraTriggerController(cave.Component):
         pass
 
     def update(self):
-        self.camera = CameraController.instances[0]
+        self.camera = GameController.camera
         Utils.updateTrigger(self)
 
     def end(self, scene):

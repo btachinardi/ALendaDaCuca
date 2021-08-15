@@ -2,18 +2,6 @@ import cave
 
 
 class CameraController(cave.Component):
-    instances = []
-
-    def __init__(self):
-        CameraController.instances.append(self)
-        self.angle = 30
-        self.originalAngle = self.angle
-        self.distance = 5
-        self.originalDistance = self.distance
-        self.target = None
-        self.smoothPosition = 0.1
-        self.smoothRotation = 0.05
-        self.lookAtVector = cave.Vector3(0, 0, 1)
 
     def setTarget(self, target, lookTarget, positionOffset):
         self.target = target
@@ -41,7 +29,14 @@ class CameraController(cave.Component):
         self.angle = self.originalAngle
 
     def start(self, scene):
-        pass
+        self.angle = 30
+        self.originalAngle = self.angle
+        self.distance = 5
+        self.originalDistance = self.distance
+        self.target = None
+        self.smoothPosition = 0.1
+        self.smoothRotation = 0.05
+        self.lookAtVector = cave.Vector3(0, 0, 1)
 
     def update(self):
         if self.target == None:

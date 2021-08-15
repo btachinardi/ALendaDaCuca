@@ -3,10 +3,12 @@ import cave
 
 class InstructionTriggerController(cave.Component):
     def start(self, scene):
-        pass
+        GameController.onInitialized(lambda: self.initialize())
+
+    def initialize(self):
+        self.instructions = GameController.instructions
 
     def update(self):
-        self.instructions = InstructionsController.instances[0]
         Utils.updateTrigger(self)
 
     def end(self, scene):

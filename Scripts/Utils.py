@@ -28,7 +28,7 @@ class Utils:
 
         if len(children) == 0:
             return Utils.globalPosition(entity, parents) if 'waypoint' in entity.name.lower() else \
-                (entity.getTransform() if 'collider' in entity.name.lower() else entity.name)
+                (entity if 'collider' in entity.name.lower() else entity.name)
 
         for child in children:
             splitName = child.name.split('=')
@@ -40,6 +40,28 @@ class Utils:
 
         return result
 
+    waypoints = None
+
+    def getWaypoints(scene, name):
+        if Utils.waypoints == None:
+            Utils.loadWaypoints(scene)
+        return Utils.waypoints[name]
+
+    def loadWaypoints(scene):
+        waypointsContainer = scene.getEntity('Waypoints')
+        Utils.waypoints = {}
+        for child in waypointsContainer.getChildren():
+            Utils.waypoints[child.name] = Utils.getWaypointsInChild(child)
+
+    def getWaypointsInChild(entity):
+        parentPos = entity.getTransform().position
+        list = []
+        for child in entity.getChildren():
+            position = parentPos + child.getTransform().position
+            list.append(position)
+
+        return list
+
     def updateTrigger(target):
         if not hasattr(target, 'data'):
             target.currentTarget = None
@@ -47,15 +69,19 @@ class Utils:
             return
 
         newTarget = None
-        transform = target.entity.getTransform()
-        pos = transform.position
-        scale = transform.scale * 2
-        if 'collider' in target.data:
-            collider = target.data['collider']
-            pos = cave.Vector3(collider.position.x + pos.x, collider.position.y + pos.y, 0)
-            scale = cave.Vector3(collider.scale.x * scale.x, collider.scale.y * scale.y, 0)
 
-        rect = Rect(pos.x - scale.x / 2, pos.y - scale.y / 2, scale.x, scale.y)
+        if not hasattr(target, 'rect'):
+            transform = target.entity.getTransform()
+            pos = transform.position
+            scale = transform.scale * 2
+            if 'collider' in target.data:
+                collider = target.data['collider']
+                colTransform = collider.getTransform()
+                pos = cave.Vector3(colTransform.position.x + pos.x, colTransform.position.y + pos.y, 0)
+                scale = cave.Vector3(colTransform.scale.x * scale.x, colTransform.scale.y * scale.y, 0)
+                collider.getScene().remove(collider)
+
+            target.rect = Rect(pos.x - scale.x / 2, pos.y - scale.y / 2, scale.x, scale.y)
 
         for physics in PhysicsController.instances:
             isValid = False
@@ -70,7 +96,7 @@ class Utils:
             targetPos = targetTransform.position
             targetScale = targetTransform.scale
             targetRect = Rect(targetPos.x - targetScale.x / 2, targetPos.y, targetScale.x, targetScale.y)
-            if rect.checkForCollision(targetRect):
+            if target.rect.checkForCollision(targetRect):
                 newTarget = physics
                 break
 

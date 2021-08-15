@@ -2,67 +2,9 @@ import cave
 
 
 class PhysicsController(cave.Component):
+
     instances = []
-
-    def findFirstInEntity(entity):
-        return next(filter(lambda i: i.entity == entity, PhysicsController.instances))
-
-    def findFirstByName(name):
-        return next(filter(lambda i: i.entity.name == name, PhysicsController.instances))
-
-    def findFirstByTag(tag):
-        return next(filter(lambda i: i.entity.hasTag(tag), PhysicsController.instances))
-
-    def findInEntity(entity):
-        return filter(lambda i: i.entity == entity, PhysicsController.instances)
-
-    def findByName(name):
-        return filter(lambda i: i.entity.name == name, PhysicsController.instances)
-
-    def findByTag(tag):
-        return filter(lambda i: i.entity.hasTag(tag), PhysicsController.instances)
-
     gravity = 30
-
-    def __init__(self):
-        PhysicsController.instances.append(self)
-        # Configurations
-        self.size = cave.Vector2(0.5, 2)  # position.x, position.y
-        self.maxSlideAngle = 60  # scale.x
-        self.minSlideAngle = 30  # scale.y
-        self.slideForce = 5
-        self.grabDistance = 0.5
-        self.grabCooldown = 0.5
-        self.climbingTime = 1.5
-        self.trippingTime = 1
-        self.trippingDistance = 2
-        self.trippingVelocity = 2
-        self.rotateSmooth = 0.1
-
-        self.groundEntity = None
-        self.groundChecker = None
-        self.isGrounded = True
-        self.isGrabbing = False
-        self.isAnimating = False
-        self.isTripping = False
-        self.groundPosition = None
-        self.grabPosition = None
-        self.groundNormal = None
-        self.verticalVelocity = 0
-        self.horizontalVelocity = 0
-        self.direction = cave.Vector3(1, 0, 0)
-        self.animationAngle = 0
-        self.climbingProgress = 0
-        self.currentGrabCooldown = 0
-
-        self.onGrab = []
-        self.onClimb = []
-        self.onGround = []
-        self.onCollision = []
-        self.onTrip = []
-        self.onAir = []
-        self.enabled = True
-        pass
 
     def animateSpeed(self, waypoints, speed, onAnimationComplete=None):
         self.setupAnimate(waypoints, onAnimationComplete)
@@ -152,6 +94,45 @@ class PhysicsController(cave.Component):
         return True
 
     def start(self, scene):
+        PhysicsController.instances.append(self)
+
+        # Configurations
+        self.size = cave.Vector2(0.5, 2)
+        self.maxSlideAngle = 60
+        self.minSlideAngle = 30
+        self.slideForce = 5
+        self.grabDistance = 0.5
+        self.grabCooldown = 0.5
+        self.climbingTime = 1.5
+        self.trippingTime = 1
+        self.trippingDistance = 2
+        self.trippingVelocity = 2
+        self.rotateSmooth = 0.1
+        self.framesToStart = 10
+
+        self.groundEntity = None
+        self.groundChecker = None
+        self.isGrounded = True
+        self.isGrabbing = False
+        self.isAnimating = False
+        self.isTripping = False
+        self.groundPosition = None
+        self.grabPosition = None
+        self.groundNormal = None
+        self.verticalVelocity = 0
+        self.horizontalVelocity = 0
+        self.direction = cave.Vector3(1, 0, 0)
+        self.animationAngle = 0
+        self.climbingProgress = 0
+        self.currentGrabCooldown = 0
+
+        self.onGrab = []
+        self.onClimb = []
+        self.onGround = []
+        self.onCollision = []
+        self.onTrip = []
+        self.onAir = []
+        self.enabled = True
         transform = self.entity.getTransform()
 
         # We offset the origin to create a capsule-like collision system
@@ -190,6 +171,10 @@ class PhysicsController(cave.Component):
 
     def update(self):
         if not self.enabled:
+            return
+
+        if self.framesToStart > 0:
+            self.framesToStart -= 1
             return
 
         self.delta = cave.getDeltaTime()

@@ -2,11 +2,8 @@ import cave
 
 
 class InputController(cave.Component):
-    instances = []
 
-    def __init__(self):
-        print('Input Controller Initialized')
-        InputController.instances.append(self)
+    def start(self, scene):
         self.up = KeyInput(['W', 'UP'])
         self.down = KeyInput(['S', 'DOWN'])
         self.left = KeyInput(['A', 'LEFT'])
@@ -17,10 +14,6 @@ class InputController(cave.Component):
 
         self.allInputs = [self.up, self.down, self.left,
                           self.right, self.jump, self.interact, self.shift]
-        pass
-
-    def start(self, scene):
-        pass
 
     def end(self, scene):
         pass
@@ -46,7 +39,6 @@ class InputController(cave.Component):
                     input.active = False
                     input.end = True
                     break
-        pass
 
 
 class KeyInput:
@@ -56,5 +48,3 @@ class KeyInput:
         self.active = False
         self.end = False
         self.onPress = []
-        pass
-
