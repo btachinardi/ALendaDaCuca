@@ -394,3 +394,7 @@ class CharacterSM(StateMachine):
         self.pushingHeavy.onlyTransitionTo([CharacterSM.Idle, CharacterSM.Dying])
         self.inAir.onlyTransitionTo([CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])
         self.jumping.onlyTransitionTo([CharacterSM.InAir, CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])
+
+
+
+

@@ -26,22 +26,12 @@ class HidingController(cave.Component):
         self.instructions.show(config)
         self.game.setInteractable(self)
 
-    def onPlayerShow(self):
-        config = self.data['instructions']
-        self.instructions.show(config)
-        self.camera.exitZone()
-
-    def onPlayerHidden(self):
-        config = self.data['exit_instructions']
-        self.instructions.show(config)
-
     def interact(self):
         if self.player.stateMachine.currentState == CharacterSM.Hiding:
             return
 
         if self.player.stateMachine.currentState == CharacterSM.Hidden:
-            self.instructions.hide()
-            self.player.show(self.exitWaypoints, self.onPlayerShow)
+            pass
         else:
             transform = self.player.entity.getTransform()
             bestDistance = 9999
@@ -55,7 +45,8 @@ class HidingController(cave.Component):
 
             pos = transform.position
             currentPosition = cave.Vector3(pos.x, pos.y, pos.z)
-            self.exitWaypoints = list(reversed([currentPosition] + bestWaypoints))
-            self.player.hide(bestWaypoints, self.onPlayerHidden)
+            self.waypoints = [currentPosition] + bestWaypoints
+            self.player.hide(bestWaypoints)
             self.camera.enterZone(self.data['camera'])
-            self.instructions.hide()
+
+

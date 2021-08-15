@@ -401,3 +401,6 @@ class CollisionResult:
         self.normal = normal
         self.position = position
         self.checker = checker
+
+
+

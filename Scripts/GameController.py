@@ -50,3 +50,5 @@ class GameController(cave.Component):
         if self.input.interact.start:
             if self.currentInteractable != None:
                 self.currentInteractable.interact()
+
+

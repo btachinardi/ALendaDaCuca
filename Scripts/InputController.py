@@ -57,3 +57,4 @@ class KeyInput:
         self.end = False
         self.onPress = []
         pass
+
