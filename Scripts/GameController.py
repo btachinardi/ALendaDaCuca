@@ -55,11 +55,8 @@ class GameController(cave.Component):
                 self.player.walk(1)
 
         if self.input.jump.start:
-            cave.playSound('Train Whistle', 0.5)
             self.player.jump()
 
         if self.input.interact.start:
             if self.currentInteractable != None:
                 self.currentInteractable.interact()
-
-

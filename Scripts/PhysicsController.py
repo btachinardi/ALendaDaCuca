@@ -122,6 +122,7 @@ class PhysicsController(cave.Component):
         self.verticalVelocity = 0
         self.horizontalVelocity = 0
         self.direction = cave.Vector3(1, 0, 0)
+        self.lastAirMovement = cave.Vector3(0, 0, 0)
         self.animationAngle = 0
         self.climbingProgress = 0
         self.currentGrabCooldown = 0
@@ -178,6 +179,7 @@ class PhysicsController(cave.Component):
             return
 
         self.delta = cave.getDeltaTime()
+
         transform = self.entity.getTransform()
         scene = self.entity.getScene()
 
@@ -263,7 +265,7 @@ class PhysicsController(cave.Component):
         origin.y += self.radius
         target = cave.Vector3(origin.x + (self.radius * self.direction.x * 1.5), origin.y, origin.z)
         raycastOut = scene.rayCast(origin, target)
-        if raycastOut.hit:
+        if raycastOut.hit and not raycastOut.entity.hasTag('Pushable'):
             topRaycastOut = scene.rayCast(raycastOut.position + cave.Vector3(self.direction.x * 0.1, self.grabDistance, 0),
                                           raycastOut.position + cave.Vector3(self.direction.x * 0.1, 0, 0))
             if topRaycastOut.hit:
@@ -282,10 +284,10 @@ class PhysicsController(cave.Component):
 
     def updateAir(self, scene, transform):
         self.verticalVelocity -= PhysicsController.gravity * self.delta
-        movement = cave.Vector3(self.horizontalVelocity * self.delta, self.verticalVelocity * self.delta, 0)
-        transform.position.y += movement.y
-        if not self.checkMovementCollision(scene, transform, movement):
-            transform.position.x += movement.x
+        self.lastAirMovement = cave.Vector3(self.horizontalVelocity * self.delta, self.verticalVelocity * self.delta, 0)
+        transform.position.y += self.lastAirMovement.y
+        if not self.checkMovementCollision(scene, transform, self.lastAirMovement):
+            transform.position.x += self.lastAirMovement.x
 
     def updateMove(self, scene, transform):
         if self.horizontalVelocity == 0:
@@ -326,17 +328,18 @@ class PhysicsController(cave.Component):
         elif movement.x < 0:
             return check(self.leftCheckers)
 
-    def checkCollisions(self, scene, checkers, origin, minAngle, maxAngle):
+    def checkCollisions(self, scene, checkers, origin, movementOffset, minAngle, maxAngle):
         bestHitDistance = 999999
         bestCollision = None
+        start = origin - movementOffset
         for checker in checkers:
             target = origin + checker
-            raycastOut = scene.rayCast(origin, target + cave.Vector3(0, -0.1, 0))
+            raycastOut = scene.rayCast(start, target + cave.Vector3(0, -0.1, 0))
             if raycastOut.hit:
                 groundAngle = MathUtils.angle(raycastOut.normal)
                 entityAngle = 90 - (groundAngle if groundAngle <= 90 else 90 - (groundAngle - 90))
                 if entityAngle >= minAngle and entityAngle < maxAngle:
-                    distance = cave.length(raycastOut.position - origin)
+                    distance = cave.length(raycastOut.position - start)
                     if distance < bestHitDistance:
                         bestHitDistance = distance
                         bestCollision = CollisionResult(raycastOut.entity,
@@ -346,7 +349,7 @@ class PhysicsController(cave.Component):
         return bestCollision
 
     def updateTop(self, scene, transform):
-        collision = self.checkCollisions(scene, self.topCheckers, transform.position + self.topOriginOffset, -9999, 9999)
+        collision = self.checkCollisions(scene, self.topCheckers, transform.position + self.topOriginOffset, self.lastAirMovement, -9999, 9999)
         if collision != None:
             self.verticalVelocity = 0
             transform.position = collision.position - collision.checker - self.topOriginOffset
@@ -360,8 +363,9 @@ class PhysicsController(cave.Component):
         self.groundPosition = None
         self.groundNormal = None
 
-        collision = self.checkCollisions(scene, self.groundCheckers, transform.position + self.groundOriginOffset, 0, self.maxSlideAngle)
+        collision = self.checkCollisions(scene, self.groundCheckers, transform.position + self.groundOriginOffset, self.lastAirMovement, 0, self.maxSlideAngle)
         if collision != None:
+            self.lastAirMovement = cave.Vector3(0, 0, 0)
             self.verticalVelocity = 0
             self.groundEntity = collision.entity
             self.groundChecker = collision.checker
@@ -386,6 +390,3 @@ class CollisionResult:
         self.normal = normal
         self.position = position
         self.checker = checker
-
-
-

@@ -40,7 +40,7 @@ class CharacterController(cave.Component):
         self.physics.animateSpeed(waypoints, self.hidingSpeed, showEnd)
         self.stateMachine.setState(CharacterSM.Hiding)
 
-    def hide(self, waypoints, onHideEnd):
+    def hide(self, waypoints, onHideEnd=None):
         def hideEnd():
             self.stateMachine.setState(CharacterSM.Hidden)
             self.physics.enabled = False
@@ -102,6 +102,7 @@ class CharacterController(cave.Component):
         self.viewMesh = self.view.get('Mesh Component')
         self.stateMachine = CharacterSM(self.viewMesh, self.getAnimationMap())
 
+    def firstUpdate(self):
         # Initializes physics callbacks
         self.physics = self.entity.get('PhysicsController')
         self.physics.onGround.append(lambda v, e: self.onGround(v, e))
@@ -114,6 +115,14 @@ class CharacterController(cave.Component):
             self.stateMachine.setState(CharacterSM.Idle)
         else:
             self.stateMachine.setState(CharacterSM.InAir)
+        self.stateMachine.dying.onEnter.append(lambda s: self.onDying())
+        self.stateMachine.dead.onExit.append(lambda s: self.onRespawn())
+
+    def onRespawn(self):
+        self.physics.enabled = True
+
+    def onDying(self):
+        self.physics.enabled = False
 
     def getAnimationMap(self):
         return {
@@ -182,6 +191,9 @@ class CharacterController(cave.Component):
 
         self.stateMachine.update(self.delta)
 
+        if self.entity.getTransform().position.y < -50:
+            self.stateMachine.setState(CharacterSM.Dying)
+
 
 class EnemyController(cave.Component):
 
@@ -219,6 +231,7 @@ class EnemyController(cave.Component):
             if child.hasTag('View'):
                 self.view = child
 
+    def firstUpdate(self):
         self.physics = self.entity.get('PhysicsController')
         self.viewMesh = self.view.get('Mesh Component')
         self.stateMachine = EnemySM(self.viewMesh, self.getAnimationMap())
@@ -493,7 +506,3 @@ class CharacterSM(StateMachine):
         self.pushingHeavy.onlyTransitionTo([CharacterSM.Idle, CharacterSM.Dying, CharacterSM.Grabbing, CharacterSM.InAir])
         self.inAir.onlyTransitionTo([CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])
         self.jumping.onlyTransitionTo([CharacterSM.InAir, CharacterSM.Idle, CharacterSM.HardLanding, CharacterSM.SoftLanding, CharacterSM.RunLanding, CharacterSM.Grabbing, CharacterSM.Dying])
-
-
-
-

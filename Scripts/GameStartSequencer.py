@@ -59,6 +59,8 @@ class GameStartSequencer(cave.Component):
             self.currentSlideView.position.setRelativeX(9999)
             self.currentSlideView = self.views[self.currentSlide.viewName]
             self.currentSlideView.position.setRelativeX(0)
+            if self.currentSlide.text != None:
+                self.currentSlideView.text = self.currentSlide.text
             self.slideChanged = True
 
     def end(self, scene):
@@ -66,6 +68,7 @@ class GameStartSequencer(cave.Component):
 
 
 class Slide:
-    def __init__(self, viewName, duration):
+    def __init__(self, viewName, duration, text=None):
         self.viewName = viewName
         self.duration = duration
+        self.text = text
