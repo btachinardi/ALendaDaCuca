@@ -11,8 +11,8 @@ class InstructionsController(cave.Component):
         self.instructionText = None
         self.targetPosition = 0
         self.verticalPosition = 0
-        self.showPosition = 75
-        self.hidePosition = 0
+        self.showPosition = 25
+        self.hidePosition = -100
         self.transform = self.entity.get('UI Element Component')
         self.transform.position.setPixelY(int(self.hidePosition))
         self.verticalPosition = self.hidePosition
@@ -46,12 +46,12 @@ class InstructionsController(cave.Component):
         self.singleKey.text = keyText
 
         if modifierText != None:
-            self.plusSign.position.setPixelY(75)
-            self.longKey.position.setPixelY(75)
+            self.plusSign.position.setPixelY(50)
+            self.longKey.position.setPixelY(50)
             self.longKey.text = modifierText
         else:
-            self.plusSign.position.setPixelY(0)
-            self.longKey.position.setPixelY(0)
+            self.plusSign.position.setPixelY(-99999)
+            self.longKey.position.setPixelY(-99999)
 
     def hide(self):
         self.isVisible = False
@@ -67,5 +67,3 @@ class InstructionsController(cave.Component):
 
     def end(self, scene):
         pass
-
-

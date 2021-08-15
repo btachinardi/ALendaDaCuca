@@ -7,6 +7,7 @@ class GameController(cave.Component):
     player = None
     camera = None
     instructions = None
+    ending = None
     onInitializedCallback = []
     isInitialized = False
 
@@ -22,6 +23,12 @@ class GameController(cave.Component):
     def clearInteractable(self):
         self.currentInteractable = None
 
+    def enableCharacter(self):
+        self.characterEnabled = True
+
+    def disableCharacter(self):
+        self.characterEnabled = False
+
     def end(self, scene):
         pass
 
@@ -30,6 +37,7 @@ class GameController(cave.Component):
         self.currentInteractable = None
 
     def firstUpdate(self):
+        self.characterEnabled = False
         scene = self.entity.getScene()
         GameController.instance = self
         GameController.input = scene.getEntity('Input').get('InputController')
@@ -43,19 +51,20 @@ class GameController(cave.Component):
 
     def update(self):
 
-        if self.input.left.active:
-            if self.input.shift.active:
-                self.player.run(-1)
-            else:
-                self.player.walk(-1)
-        if self.input.right.active:
-            if self.input.shift.active:
-                self.player.run(1)
-            else:
-                self.player.walk(1)
+        if self.characterEnabled:
+            if self.input.left.active:
+                if self.input.shift.active:
+                    self.player.run(-1)
+                else:
+                    self.player.walk(-1)
+            if self.input.right.active:
+                if self.input.shift.active:
+                    self.player.run(1)
+                else:
+                    self.player.walk(1)
 
-        if self.input.jump.start:
-            self.player.jump()
+            if self.input.jump.start:
+                self.player.jump()
 
         if self.input.interact.start:
             if self.currentInteractable != None:
